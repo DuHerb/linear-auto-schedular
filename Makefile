@@ -34,10 +34,11 @@ mcp-list:
 	claude mcp list
 
 # One-shot JSON-RPC against an MCP service. Pipes FILE into the named
-# service's stdin under a SIGALRM watchdog, so the container is killed
-# after RPC_TIMEOUT seconds and `--rm` cleans up even if the upstream
-# image doesn't exit on stdin EOF (e.g. third-party MCPs we can't patch).
-# Usage:
+# service's stdin under a SIGALRM watchdog. After RPC_TIMEOUT seconds
+# the docker CLI is killed (SIGALRM's default disposition is terminate);
+# the daemon notices the gone-away client and `--rm` cleans up the
+# container — even if the upstream image doesn't exit on stdin EOF
+# (e.g. third-party MCPs we can't patch). Usage:
 #   make rpc SVC=scheduler-state FILE=/tmp/rpc.txt
 #
 # We use a perl one-liner (`alarm` + `exec`) instead of GNU coreutils

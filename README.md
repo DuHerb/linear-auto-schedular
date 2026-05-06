@@ -76,7 +76,7 @@ EOF
 make rpc SVC=scheduler-state FILE=/tmp/rpc.txt
 ```
 
-The wrapper runs `docker compose run --rm -T <SVC>` under `timeout` so the container is SIGTERMed after `RPC_TIMEOUT` (default 5s) seconds and `--rm` actually removes it. **Without the timeout**, stdio MCP servers stay alive after stdin EOF and leak `*-run-*` containers (DUS-12 root cause).
+The wrapper runs `docker compose run --rm -T <SVC>` under a `perl alarm` watchdog (portable across macOS + Linux without requiring `brew install coreutils`). After `RPC_TIMEOUT` seconds (default 5) the docker CLI is killed, the container exits, and `--rm` removes it. **Without the watchdog**, stdio MCP servers that don't exit on stdin EOF leak `*-run-*` containers (DUS-12 root cause).
 
 If you ever notice leaked containers anyway: `make clean-orphans` sweeps any `linear-auto-scheduler-*-run-*` containers.
 
@@ -91,7 +91,7 @@ See [`PLANNING.md`](./PLANNING.md) §"Repository layout".
 ## Troubleshooting
 
 - **OAuth token expired (7-day test mode):** re-run `npx @cocal/google-calendar-mcp auth` per `docs/google-oauth-setup.md`.
-- **`claude mcp list` shows scheduler-state failed:** `make rebuild`, then `make rpc SVC=scheduler-state FILE=/tmp/rpc.txt` (or just `timeout 5 docker compose run --rm scheduler-state`) to see boot errors on stderr without leaving an orphan container behind.
+- **`claude mcp list` shows scheduler-state failed:** `make rebuild`, then `make rpc SVC=scheduler-state FILE=/tmp/rpc.txt` to see boot errors on stderr without leaving an orphan container behind.
 - **`better-sqlite3` build fails:** Alpine needs `python3 make g++` in the builder stage — already in the Dockerfile. If it still flakes, switch the base image to `node:20` (debian).
 - **SQLite locked:** WAL mode is enabled, but if you have a stale `claude` process holding it, `make down && make up`.
 
