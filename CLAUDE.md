@@ -13,7 +13,7 @@ You are the orchestration agent for a personal scheduling system. Three MCPs are
 ## Linear scope
 
 - **Workspace:** `dustin-hack`
-- **Team:** `<TBD — fill in during pre-flight step 4>`. The agent that bootstraps the Linear board sets this. Until set, `/plan-week` will pull all issues assigned to the user across all teams in `dustin-hack` — usually still correct, but explicit team filtering is safer.
+- **Team:** `Dustin-Hack` (key: `DUS`, id: `926c5b83-d21d-4f78-87be-df123777a292`). Issues are identified `DUS-N`.
 - **Project:** `Hackathon: Scheduler Agent`
 
 When listing Linear issues for `/plan-week`, restrict to this team + project unless the user explicitly asks otherwise.
