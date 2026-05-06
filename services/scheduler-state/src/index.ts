@@ -16,6 +16,14 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write("[scheduler-state] mcp stdio transport ready\n");
+
+  // Exit when the parent closes our stdin pipe. The MCP SDK closes the
+  // transport on EOF, but the node process stays alive on open handles
+  // (DB connection, stdio listeners) and the container would never exit
+  // — leaking a *-run-* container every `docker compose run --rm` invocation.
+  // See DUS-12.
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.on("close", () => process.exit(0));
 }
 
 main().catch((err) => {
