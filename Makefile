@@ -96,7 +96,11 @@ ensure-schema:
 		printf '%s\n%s\n' \
 			'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"init","version":"0"},"capabilities":{}}}' \
 			'{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-		| perl -e 'alarm 5; exec @ARGV or die $$!' docker compose run --rm -T scheduler-state >/dev/null 2>&1 || true; \
+		| perl -e 'alarm 5; exec @ARGV or die $$!' docker compose run --rm -T scheduler-state >/dev/null 2>&1; \
+		sqlite3 data/scheduler.db ".tables" 2>/dev/null | grep -q signals || \
+			(echo "ERROR: ensure-schema did not create the signals table." && \
+			 echo "       Is the scheduler-state image built? Try: make build" && \
+			 exit 1); \
 	fi
 
 webhook-up: ensure-schema
@@ -127,8 +131,8 @@ process-signals:
 # Polling drain. Single-process serial loop — running two `make watch-signals`
 # at once will race the calendar; don't. The mkdir-based lock below is a
 # best-effort guard that's portable across macOS (no `flock` by default) and
-# Linux. The lock doubles as a stale-PID indicator: if the process crashes,
-# rerun with `make watch-signals-force` which clears /tmp/lin-sched-watch.lock.
+# Linux. If a previous run crashed without releasing the lock, recover with:
+#   rmdir /tmp/lin-sched-watch.lock
 WATCH_INTERVAL ?= 30
 WATCH_LOCK ?= /tmp/lin-sched-watch.lock
 watch-signals:

@@ -66,13 +66,12 @@ export const mappingsTools = [
   {
     name: "update_mapping_status",
     description:
-      "Updates a mapping's status (scheduled | in_progress | completed | cancelled) and bumps updated_at. Used by /process-signals when Linear issue state changes drive calendar lifecycle. Args: { mapping_id, status, note? }. The note is appended into resolution-style breadcrumbs in subsequent log lines but isn't persisted on the row itself in v1.",
+      "Updates a mapping's status (scheduled | in_progress | completed | cancelled) and bumps updated_at. Used by /process-signals when Linear issue state changes drive calendar lifecycle. Args: { mapping_id, status }.",
     inputSchema: {
       type: "object" as const,
       properties: {
         mapping_id: { type: "string" },
         status: { type: "string" },
-        note: { type: "string" },
       },
       required: ["mapping_id", "status"],
       additionalProperties: false,
@@ -108,7 +107,6 @@ const GetMappingForEventArgs = z.object({
 const UpdateMappingStatusArgs = z.object({
   mapping_id: z.string().uuid(),
   status: MappingStatus,
-  note: z.string().optional(),
 });
 
 const RecordMappingArgs = z

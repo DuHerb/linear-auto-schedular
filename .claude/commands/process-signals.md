@@ -73,6 +73,6 @@ If invoked interactively (without `--dangerously-skip-permissions`), still proce
 This command is invoked one of two ways:
 
 1. **On-demand**: `claude /process-signals` (interactive, runs once).
-2. **Polling loop**: `make watch-signals` runs a host-side loop that invokes `claude -p '/process-signals' --dangerously-skip-permissions` every 30 seconds under `flock` so two invocations never overlap. This is the production path during the demo — it satisfies the DUS-9 cron-fallback acceptance criterion.
+2. **Polling loop**: `make watch-signals` runs a host-side loop that invokes `claude -p '/process-signals' --dangerously-skip-permissions` every 30 seconds. The Makefile target acquires a portable `mkdir`-based lock so a second `make watch-signals` aborts with an explicit message rather than racing the calendar. This is the production path during the demo — it satisfies the DUS-9 cron-fallback acceptance criterion.
 
 The webhook listener does **not** invoke `claude` itself; it only writes signals. Decoupling keeps the listener container minimal (no `claude` CLI / no host config mounts) and the polling loop trivially serializable.
