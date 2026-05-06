@@ -9,8 +9,13 @@ import {
   plansTools,
   handleSavePlan,
   handleGetLatestPlan,
+  handleMarkPlanApplied,
 } from "./tools/plans.js";
-import { mappingsTools } from "./tools/mappings.js";
+import {
+  mappingsTools,
+  handleRecordMapping,
+  handleListActiveMappings,
+} from "./tools/mappings.js";
 import { signalsTools } from "./tools/signals.js";
 
 const allTools = [
@@ -28,6 +33,9 @@ const handlers: Record<string, Handler> = {
   get_preferences: () => handleGetPreferences(),
   save_plan: (args) => handleSavePlan(args),
   get_latest_plan: () => handleGetLatestPlan(),
+  mark_plan_applied: (args) => handleMarkPlanApplied(args),
+  record_mapping: (args) => handleRecordMapping(args),
+  list_active_mappings: () => handleListActiveMappings(),
 };
 
 export function createServer(): Server {
