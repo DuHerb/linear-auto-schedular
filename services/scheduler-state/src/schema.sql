@@ -1,5 +1,11 @@
 -- scheduler-state schema. Idempotent — safe to re-apply on every boot.
 -- Source of truth: PLANNING.md §"SQLite schema". Do not deviate.
+--
+-- Timestamp convention: ISO 8601 UTC with millisecond precision
+-- (e.g. 2026-05-06T19:30:49.123Z). All DB-side defaults use
+-- strftime('%Y-%m-%dT%H:%M:%fZ','now') so readers don't have to
+-- reformat. App-supplied timestamps (planned_start, planned_end)
+-- must also be ISO 8601 — enforced by the zod schemas in tools/.
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
@@ -10,8 +16,8 @@ CREATE TABLE IF NOT EXISTS signals (
   source         TEXT NOT NULL,
   kind           TEXT NOT NULL,
   payload        TEXT NOT NULL,
-  received_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  processed_at   TIMESTAMP,
+  received_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  processed_at   TEXT,
   resolution     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_signals_unprocessed
@@ -20,8 +26,8 @@ CREATE INDEX IF NOT EXISTS idx_signals_unprocessed
 -- Plans: each /plan-week run produces one row. /apply-plan reads the latest.
 CREATE TABLE IF NOT EXISTS plans (
   plan_id        TEXT PRIMARY KEY,
-  generated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  applied_at     TIMESTAMP,
+  generated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  applied_at     TEXT,
   content        TEXT NOT NULL
 );
 
@@ -34,12 +40,12 @@ CREATE TABLE IF NOT EXISTS mappings (
   calendar_id             TEXT NOT NULL,
   session_index           INTEGER NOT NULL,
   total_sessions          INTEGER NOT NULL,
-  planned_start           TIMESTAMP NOT NULL,
-  planned_end             TIMESTAMP NOT NULL,
+  planned_start           TEXT NOT NULL,
+  planned_end             TEXT NOT NULL,
   status                  TEXT NOT NULL,
   plan_id                 TEXT REFERENCES plans(plan_id),
-  created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_mappings_issue ON mappings(linear_issue_id);
 CREATE INDEX IF NOT EXISTS idx_mappings_event ON mappings(calendar_event_id);
