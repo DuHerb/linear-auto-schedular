@@ -33,6 +33,12 @@ const PreferencesSchema = z.object({
   calendars: z.object({
     primary_email: z.string(),
     agent_writes_to: z.string(),
+    // Calendars whose busy intervals the planner should treat as conflicts.
+    // When omitted, /plan-week defaults to every calendar the user has
+    // access to (via list-calendars) minus `agent_writes_to`. Set this
+    // explicitly to narrow the scope. An empty array disables conflict
+    // checking entirely — to use the default expansion, omit the field.
+    conflict_sources: z.array(z.string()).optional(),
   }),
 });
 

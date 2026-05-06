@@ -33,7 +33,15 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
 
    Default to the *lower* end of a plausible range when signals are ambiguous. Padded estimates eat the user's planning windows; the dedicated `Focus Sessions` calendar is cheap to extend if a session runs long.
 
-4. **Read calendar free/busy** — call `google-calendar.freebusy` for the next 7 weekdays on the user's primary calendar.
+4. **Read calendar free/busy across all conflict sources.**
+
+   - Resolve the set of calendars to query:
+     - If `calendars.conflict_sources` is set in preferences, use it verbatim.
+     - If it is omitted (default), call `google-calendar.list-calendars`, take every returned calendar ID, and **exclude `calendars.agent_writes_to`** so the planner doesn't see its own past output as conflicts. Do **not** filter on `selected` — calendars hidden in the user's UI are still treated as conflicts under the safer-by-default rule. Users opt out by setting `conflict_sources` explicitly.
+   - Call `google-calendar.get-freebusy` **once** with the full resolved list as the `calendars` array (the API accepts an array — do not loop). Time range: the next 7 weekdays.
+   - Union the busy intervals returned for each calendar before slotting; treat any overlap on any source as busy.
+   - Apply `defaults.buffer_around_meetings_minutes` to the unioned set, not per-calendar.
+   - **Capture the resolved list** — you will surface it in step 6 so the user can debug "why did it think this slot was free."
 
 5. **Compose schedule** — per-day slotting:
 
@@ -56,9 +64,11 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
      4. `session_index` and `total_sessions` reflect the *final* chunk count after cross-day adjustment, not the initial `ceil()` estimate.
    - **Breaks (anticipatory).** Track continuous-work minutes per day. Before scheduling each session, check whether adding it would push the counter past `break_after_minutes`. If so, insert a `break_duration_minutes` gap *before* the session and reset the counter to 0; the new session then starts fresh and increments the counter by its own duration. The break does not need to be its own JSON entry — just leave the gap in the markdown output and skip those minutes when picking the next session's start. Reset the counter when crossing a busy block, lunch, or end-of-day (those are natural breaks). Worked example with `break_after_minutes=120`, `break_duration_minutes=15`: 90 min session (counter=90) → next is 60 min, 90+60=150 > 120 → insert 15 min break *first*, reset counter, then schedule 60 min session (counter=60). Result: `90 → break → 60 → …`. The intent is to never let the agent actually do more than `break_after_minutes` of continuous focused work.
 
-6. **Output the plan** — markdown to stdout, grouped by weekday:
+6. **Output the plan** — markdown to stdout, grouped by weekday. Lead with a one-line `Considered calendars:` header listing the calendar IDs (or summary names if shorter) used for free/busy in step 4. This makes silent over-scheduling debuggable.
 
    ```
+   Considered calendars: dustin.herboldshimer@olioapps.com, dustnpdx@gmail.com, Pack 685 Calendar, Olio - Time Off
+
    ## Monday, Mar 10
    - 09:00–10:30 [ENG-123] Fix login bug (90min, 1/1) — body says ~3 unit tests + validation tweak
    - 10:30–10:45 break
