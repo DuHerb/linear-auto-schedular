@@ -50,10 +50,14 @@ calendars:
   agent_writes_to: "REPLACE_WITH_FOCUS_SESSIONS_CALENDAR_ID"
 
   # OPTIONAL — explicit list of calendar IDs whose busy intervals the planner
-  # treats as conflicts. When omitted, /plan-week defaults to every calendar
-  # the user has access to (via list-calendars) minus `agent_writes_to`. The
-  # safer-by-default behavior is to consider everything; set this list to
-  # narrow the scope (e.g., ignore a noisy team-wide PTO calendar).
+  # treats as conflicts. When omitted (recommended), /plan-week defaults to
+  # every calendar the user has access to (via list-calendars) minus
+  # `agent_writes_to`. The safer-by-default behavior is to consider
+  # everything; set this list to a *non-empty* subset to narrow the scope
+  # (e.g., ignore a noisy team-wide PTO calendar). An empty list (`[]`)
+  # disables conflict checking entirely and reintroduces the silent
+  # over-scheduling bug DUS-11 fixes — to use the default expansion, remove
+  # this field, do not set it to `[]`.
   #
   # conflict_sources:
   #   - "you@example.com"
