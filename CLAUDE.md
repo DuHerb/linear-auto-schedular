@@ -20,6 +20,17 @@ When listing Linear issues for `/plan-week`, restrict to this team + project unl
 
 ---
 
+## Ticket lifecycle — durable convention
+
+For every story DUS-N:
+
+1. **At story start** (before opening a feature branch): move the Linear ticket to **In Progress** via the `linear` MCP (`save_issue` with `state: "In Progress"`).
+2. **At story PR merge** (after squash-merge to main): move the Linear ticket to **Done**.
+
+This applies to every story going forward, not just the current one. Skipping it leaves Linear stale and breaks the meta-demo where the agent plans against its own remaining tickets.
+
+---
+
 ## Calendar safety rules — non-negotiable
 
 1. **Never create, update, or delete a calendar event without an explicit user "yes".** This rule applies even in agentic loops. The confirmation step in `/apply-plan` is the firewall.
