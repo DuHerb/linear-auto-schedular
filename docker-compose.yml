@@ -1,0 +1,35 @@
+services:
+  scheduler-state:
+    build:
+      context: ./services/scheduler-state
+      dockerfile: Dockerfile
+    image: linear-auto-scheduler/scheduler-state:dev
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    environment:
+      DB_PATH: /app/data/scheduler.db
+      PREFS_PATH: /app/config/preferences.yaml
+    stdin_open: true
+    tty: false
+    restart: "no"
+
+  google-calendar-mcp:
+    image: ghcr.io/metorial/mcp-container--nspady--google-calendar-mcp--google-calendar-mcp:latest
+    volumes:
+      - ./config/credentials/gcp-oauth.keys.json:/config/gcp-oauth.keys.json:ro
+      - ./config/credentials/google-token.json:/config/tokens.json
+    environment:
+      GOOGLE_OAUTH_CREDENTIALS: /config/gcp-oauth.keys.json
+      GOOGLE_CALENDAR_MCP_TOKEN_PATH: /config/tokens.json
+    stdin_open: true
+    tty: false
+    restart: "no"
+
+  dozzle:
+    image: amir20/dozzle:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

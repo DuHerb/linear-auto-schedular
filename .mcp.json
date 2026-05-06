@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "linear": {
+      "type": "sse",
+      "url": "https://mcp.linear.app/sse"
+    },
+    "google-calendar": {
+      "command": "docker",
+      "args": ["compose", "run", "--rm", "-T", "google-calendar-mcp"]
+    },
+    "scheduler-state": {
+      "command": "docker",
+      "args": ["compose", "run", "--rm", "-T", "scheduler-state"]
+    }
+  }
+}

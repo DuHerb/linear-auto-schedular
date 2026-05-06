@@ -1,0 +1,30 @@
+# Secrets / credentials
+.env
+.env.local
+config/credentials/*
+!config/credentials/.gitkeep
+
+# Runtime data (volume mount)
+data/*
+!data/.gitkeep
+
+# Agent scratch
+.agent/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
