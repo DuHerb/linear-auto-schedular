@@ -4,12 +4,17 @@
 config/credentials/*
 !config/credentials/.gitkeep
 
+# Real user preferences (contains email + calendar ID).
+# Committed example lives at config/preferences.example.yaml.
+config/preferences.yaml
+
 # Runtime data (volume mount)
 data/*
 !data/.gitkeep
 
 # Agent scratch
 .agent/
+.claude/scheduled_tasks.lock
 
 # Node
 node_modules/

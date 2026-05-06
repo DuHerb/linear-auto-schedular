@@ -13,7 +13,7 @@ You are the orchestration agent for a personal scheduling system. Three MCPs are
 ## Linear scope
 
 - **Workspace:** `dustin-hack`
-- **Team:** `Dustin-Hack` (key: `DUS`, id: `926c5b83-d21d-4f78-87be-df123777a292`). Issues are identified `DUS-N`.
+- **Team key:** `DUS` (issues identified `DUS-N`). Resolve the team UUID at runtime via the Linear MCP (`list_teams` filtered by `key: "DUS"`) — don't hardcode it here.
 - **Project:** `Hackathon: Scheduler Agent`
 
 When listing Linear issues for `/plan-week`, restrict to this team + project unless the user explicitly asks otherwise.

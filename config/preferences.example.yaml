@@ -1,5 +1,9 @@
-# Scheduler preferences. Source of truth for user-level scheduling behavior.
-# scheduler-state MCP loads this on every tool call that needs it.
+# Scheduler preferences EXAMPLE template.
+#
+# Copy this file to `config/preferences.yaml` and fill in real values.
+# The real file is gitignored — never commit it. Source of truth for
+# user-level scheduling behavior; scheduler-state MCP loads it on every
+# tool call that needs it.
 
 timezone: America/Los_Angeles
 
@@ -38,5 +42,9 @@ fixed_blocks:
     type: block
 
 calendars:
-  primary_email: "dustin.herboldshimer@olioapps.com"
-  agent_writes_to: "c_9a0059cf2563ba90b4a3aa92fdf18d07e34da90625ed02acdc9b20240925a5a4@group.calendar.google.com"
+  # Replace with your real Gmail/Workspace email
+  primary_email: "you@example.com"
+  # Replace with the Focus Sessions calendar ID
+  # (looks like c_abcd1234@group.calendar.google.com), captured per
+  # docs/google-oauth-setup.md §Step 8
+  agent_writes_to: "REPLACE_WITH_FOCUS_SESSIONS_CALENDAR_ID"
