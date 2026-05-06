@@ -17,18 +17,37 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
    - Status in: Backlog, Todo, In Progress, Ready for Development
    - Order: priority desc (Urgent → P1 → P2 → P3 → P4), then created_at asc
 
-3. **Read issue context for estimation** — for each issue, fetch body + comments. Estimate effort in minutes from text. Output one reasoning line per issue. No model, just judgment.
+3. **Read issue context for estimation** — for each issue returned in step 2, call `linear.get_issue(id)` so the body and the full comment thread are loaded (the `list_issues` response carries titles + priorities only). Estimate effort in minutes from that text. No ML model, no fixture lookup — pure LLM judgment from the issue text. Surface one short reasoning line per issue tied to concrete signals.
+
+   **Estimation rubric** — weigh these signals when reading body + comments. The reasoning line should name the ones that drove the estimate so the user can audit calibration over time:
+
+   | Signal | Pulls estimate ↑ | Pulls estimate ↓ |
+   |---|---|---|
+   | Number of acceptance criteria | many discrete checkboxes | one or two |
+   | Files / surfaces touched | crosses module boundaries, touches schema | single file, single function |
+   | Test surface | new test fixtures, multiple test types | trivial unit test, no new fixtures |
+   | New abstractions / config schema changes | yes | no |
+   | Comment thread density | active back-and-forth, open questions | quiet, body-only |
+   | "Stretch", "research", "spike" language | ↑ | — |
+   | Direct-edit language (rename, typo, doc tweak) | — | ↓ |
+
+   Default to the *lower* end of a plausible range when signals are ambiguous. Padded estimates eat the user's planning windows; the dedicated `Focus Sessions` calendar is cheap to extend if a session runs long.
 
 4. **Read calendar free/busy** — call `google-calendar.freebusy` for the next 7 weekdays on the user's primary calendar.
 
 5. **Compose schedule** — per-day slotting:
+
    - Work only inside `working_hours[<weekday>]`.
    - Skip slots overlapping any busy block (with `defaults.buffer_around_meetings_minutes` margin on both sides).
    - Honor `fixed_blocks` of `type: block` (lunch, office_hours) — never schedule over them.
    - For `fixed_blocks` of `type: flexible` (workout) — pick a slot inside the window.
-   - Sessions ≤ `defaults.session_max_minutes`. Insert a `break_duration_minutes` gap after every `break_after_minutes` of continuous work.
-   - Issues estimated > `session_max_minutes` split into N sequential sessions: `ceil(estimate / session_max_minutes)`, equal-ish chunks, scheduled in priority order.
-   - Tie-break equal-priority issues by issue creation date (older first).
+   - **Sequencing.** Order issues by Linear `priority` (1 Urgent → 2 High → 3 Medium → 4 Low → 0 None). Tie-break equal-priority issues by `createdAt` ascending (older first). Worked example: P1 created Mar 5 lands before P1 created Mar 7; both land before any P2.
+   - **Chunking.** If `estimate_minutes <= session_max_minutes` → one session. Otherwise split into `N = ceil(estimate / session_max_minutes)` equal-ish sessions, each `round(estimate / N)` minutes. Schedule chunks in `session_index` order (1, 2, …, N), with the constraint that a higher-index chunk must start at or after the previous chunk's end. Worked examples (with default `session_max_minutes=120`):
+     - 90 min → 1 session of 90
+     - 180 min → 2 sessions of 90 (not 120 + 60 — keep chunks roughly equal so reasoning is consistent across sessions)
+     - 240 min → 2 sessions of 120
+     - 300 min → 3 sessions of 100
+   - **Breaks.** Track continuous-work minutes per day. After accumulating `break_after_minutes` of work, insert a `break_duration_minutes` gap before scheduling the next session. The break does not need to be its own JSON entry — just leave the gap in the markdown output and skip those minutes when picking the next session's start. Reset the counter when crossing a busy block, lunch, or end-of-day. Worked example with defaults (`break_after_minutes=120`, `break_duration_minutes=15`): a 90 min session then a 60 min session back-to-back is fine (90 + 60 = 150 > 120, so insert the 15 min break *before* the 60 min session begins, not in the middle of it).
 
 6. **Output the plan** — markdown to stdout, grouped by weekday:
 
@@ -42,7 +61,7 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
    Total: 6h 15m across 4 days. plan_id: <id>
    ```
 
-7. **Persist the plan** — call `scheduler-state.save_plan` with structured JSON:
+7. **Persist the plan** — call `scheduler-state.save_plan` with structured JSON. The schema below is the minimum; descriptive fields (`title`, `reasoning`, `linear_url`, `estimate_minutes`, `priority`) pass through and are surfaced by `/apply-plan` in event titles and descriptions.
 
    ```json
    {
@@ -53,16 +72,22 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
          "linear_issue_identifier": "ENG-123",
          "title": "Fix login bug",
          "linear_url": "https://linear.app/...",
+         "priority": 1,
          "session_index": 1,
-         "total_sessions": 1,
+         "total_sessions": 2,
          "planned_start": "2026-03-10T09:00:00-08:00",
          "planned_end": "2026-03-10T10:30:00-08:00",
-         "estimate_minutes": 90,
-         "reasoning": "..."
+         "estimate_minutes_total": 180,
+         "estimate_minutes_session": 90,
+         "reasoning": "Body lists 3 acceptance criteria touching auth + session storage; comment thread surfaces an open question about token rotation. Mid-complexity; signals: many criteria, schema touch, active thread."
        }
      ]
    }
    ```
+
+   - `priority` must mirror Linear's `priority` value (0 None, 1 Urgent, 2 High, 3 Medium, 4 Low) so `/apply-plan` and downstream consumers don't have to re-fetch the issue.
+   - `estimate_minutes_total` is the whole-issue estimate; `estimate_minutes_session` is this chunk. Equal across sessions when the issue is split.
+   - `reasoning` should name at least one rubric signal so calibration is auditable from the saved plan alone.
 
 8. **Echo `plan_id`** — print it on the last line so the user can reference it.
 
