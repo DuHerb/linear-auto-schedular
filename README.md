@@ -63,6 +63,25 @@ make db-shell               # interactive sqlite3
 
 ---
 
+## Smoke-testing MCP handlers
+
+Pipe a JSON-RPC request file into a service's stdin via the `make rpc` wrapper:
+
+```bash
+cat <<'EOF' > /tmp/rpc.txt
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"smoke","version":"0"},"capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_preferences","arguments":{}}}
+EOF
+make rpc SVC=scheduler-state FILE=/tmp/rpc.txt
+```
+
+The wrapper runs `docker compose run --rm -T <SVC>` under a `perl alarm` watchdog (portable across macOS + Linux without requiring `brew install coreutils`). After `RPC_TIMEOUT` seconds (default 5) the docker CLI is killed, the container exits, and `--rm` removes it. **Without the watchdog**, stdio MCP servers that don't exit on stdin EOF leak `*-run-*` containers (DUS-12 root cause).
+
+If you ever notice leaked containers anyway: `make clean-orphans` sweeps any `linear-auto-scheduler-*-run-*` containers.
+
+---
+
 ## Repo layout
 
 See [`PLANNING.md`](./PLANNING.md) §"Repository layout".
@@ -72,7 +91,7 @@ See [`PLANNING.md`](./PLANNING.md) §"Repository layout".
 ## Troubleshooting
 
 - **OAuth token expired (7-day test mode):** re-run `npx @cocal/google-calendar-mcp auth` per `docs/google-oauth-setup.md`.
-- **`claude mcp list` shows scheduler-state failed:** `make rebuild` then `docker compose run --rm scheduler-state` to see boot errors on stderr.
+- **`claude mcp list` shows scheduler-state failed:** `make rebuild`, then `make rpc SVC=scheduler-state FILE=/tmp/rpc.txt` to see boot errors on stderr without leaving an orphan container behind.
 - **`better-sqlite3` build fails:** Alpine needs `python3 make g++` in the builder stage — already in the Dockerfile. If it still flakes, switch the base image to `node:20` (debian).
 - **SQLite locked:** WAL mode is enabled, but if you have a stale `claude` process holding it, `make down && make up`.
 
