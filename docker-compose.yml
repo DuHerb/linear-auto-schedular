@@ -26,6 +26,24 @@ services:
     tty: false
     restart: "no"
 
+  linear-webhook-listener:
+    build:
+      context: ./services/linear-webhook-listener
+      dockerfile: Dockerfile
+    image: linear-auto-scheduler/linear-webhook-listener:dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      PORT: 3000
+      DB_PATH: /app/data/scheduler.db
+      # Validation lives in src/index.ts — a startup check exits with a clear error
+      # if unset, so the build path doesn't need a value.
+      LINEAR_WEBHOOK_SECRET: ${LINEAR_WEBHOOK_SECRET:-}
+    restart: unless-stopped
+    profiles: ["webhook"]
+
   dozzle:
     image: amir20/dozzle:latest
     ports:
