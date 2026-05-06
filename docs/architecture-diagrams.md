@@ -1,15 +1,54 @@
 # Architecture & Flow Diagrams
 
-Two views of the webhook-driven auto-scheduling pipeline (DUS-9):
+Three views of the webhook-driven auto-scheduling pipeline (DUS-9), zooming in:
 
-1. **Topology** — every process, where data flows, what crosses the network.
-2. **Per-signal state machine** — the dispatch logic inside `/process-signals` once a signal lands in SQLite.
+1. **Executive summary** — four actors, the value loop, no implementation detail.
+2. **Topology** — every process, where data flows, what crosses the network.
+3. **Per-signal state machine** — the dispatch logic inside `/process-signals` once a signal lands in SQLite.
 
 For the lifecycle commands (`/scheduler-up` / `/scheduler-down`) and the demo runbook, see [`demo-runbook.md`](./demo-runbook.md). For the v2 SDK migration analysis, see [`agent-sdk-migration.md`](./agent-sdk-migration.md).
 
 ---
 
-## 1. Topology
+## 1. Executive summary
+
+The user manages tickets in Linear and lives on Google Calendar. The Auto-Scheduler is the bridge: when ticket state changes, focused-work time appears (or disappears) on the calendar without manual planning.
+
+```mermaid
+flowchart LR
+    User(["Engineer"])
+    Linear["Linear<br/>(issue tracker)"]
+    AS["Auto-Scheduler<br/>(this system)"]
+    GC["Google Calendar<br/>(Focus Sessions)"]
+
+    User -->|update ticket state| Linear
+    Linear -->|notify: state changed| AS
+    AS -->|read issue body + comments| Linear
+    AS -->|create / update / cancel<br/>focused-work blocks| GC
+    User -->|sees blocks on calendar| GC
+```
+
+### What each actor owns
+
+| Actor | Owns | Doesn't own |
+|---|---|---|
+| **Engineer** | Ticket state in Linear; the act of doing the work | Calendar arrangement (delegates to Auto-Scheduler) |
+| **Linear** | Source of truth for issue state, priority, body, comments | Time and scheduling |
+| **Auto-Scheduler** | When and how long each focused-work block sits on the calendar; the issue ↔ event mapping | Issue content (read-only); calendar UX |
+| **Google Calendar** | Source of truth for time conflicts (existing meetings) and the rendered focused-work blocks | Issue context |
+
+### The value loop
+
+1. Engineer drags a ticket from "Backlog" to "Ready for Development." That's the only manual action.
+2. Auto-Scheduler hears about it, reads the issue, finds an open slot on the calendar that respects working hours, fixed blocks, and existing meetings across all calendars the user belongs to.
+3. A block appears on Focus Sessions with the issue title, Linear backlink, and the agent's reasoning for the estimate.
+4. Engineer drags the same ticket to "Done" → the block stays as history. To "Cancelled" → future block vanishes. To "Backlog" → same.
+
+No `claude` invocation, no terminal commands, no spreadsheet. The engineer's calendar reflects their Linear board automatically.
+
+---
+
+## 2. Topology
 
 End-to-end view of one webhook delivery, from Linear UI drag to calendar event creation. Boxes that share the same enclosing subgraph live in the same trust domain or process boundary.
 
@@ -89,7 +128,7 @@ flowchart TB
 
 ---
 
-## 2. Per-signal state machine
+## 3. Per-signal state machine
 
 What `/process-signals` does once it picks up an unprocessed signal. Every terminal state ends in `mark_signal_processed`, even no-ops, so signals never re-drain.
 
