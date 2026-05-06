@@ -23,7 +23,7 @@ export const plansTools = [
   {
     name: "mark_plan_applied",
     description:
-      "Marks a plan as applied (sets applied_at = now). Args: { plan_id }. Stub in v1 — implemented in Story 2 (DUS-7).",
+      "Marks a plan as applied (sets applied_at = now in UTC ISO 8601). Args: { plan_id }. Rejects double-apply: a second call for the same plan_id throws, so accidental re-runs of /apply-plan surface loudly instead of silently re-stamping applied_at.",
     inputSchema: {
       type: "object" as const,
       properties: { plan_id: { type: "string" } },
@@ -59,6 +59,10 @@ const SavePlanArgs = z.object({
   content: PlanContentSchema,
 });
 
+const MarkPlanAppliedArgs = z.object({
+  plan_id: z.string().uuid(),
+});
+
 export type PlanContent = z.infer<typeof PlanContentSchema>;
 
 interface PlanRow {
@@ -85,6 +89,35 @@ export function handleSavePlan(rawArgs: unknown): { plan_id: string } {
     .prepare("INSERT INTO plans (plan_id, content) VALUES (?, ?)")
     .run(planId, JSON.stringify(args.content));
   return { plan_id: planId };
+}
+
+export function handleMarkPlanApplied(rawArgs: unknown): {
+  plan_id: string;
+  applied_at: string;
+} {
+  const { plan_id } = MarkPlanAppliedArgs.parse(rawArgs);
+  const db = getDb();
+  const appliedAt = new Date().toISOString();
+  // Atomic guard: only stamp applied_at if it's still NULL. Two concurrent
+  // /apply-plan invocations can each pass a SELECT-then-UPDATE check before
+  // either write lands; collapsing to one statement prevents that race.
+  const result = db
+    .prepare(
+      "UPDATE plans SET applied_at = ? WHERE plan_id = ? AND applied_at IS NULL",
+    )
+    .run(appliedAt, plan_id);
+  if (result.changes === 0) {
+    const existing = db
+      .prepare("SELECT applied_at FROM plans WHERE plan_id = ?")
+      .get(plan_id) as { applied_at: string | null } | undefined;
+    if (!existing) {
+      throw new Error(`plan ${plan_id} not found`);
+    }
+    throw new Error(
+      `plan ${plan_id} already applied at ${existing.applied_at}; refusing to overwrite`,
+    );
+  }
+  return { plan_id, applied_at: appliedAt };
 }
 
 export function handleGetLatestPlan(): Plan | null {
