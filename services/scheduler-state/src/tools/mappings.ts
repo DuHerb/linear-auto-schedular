@@ -97,18 +97,23 @@ const MappingStatus = z.enum([
   "cancelled",
 ]);
 
-const RecordMappingArgs = z.object({
-  linear_issue_id: z.string().min(1),
-  linear_issue_identifier: z.string().min(1),
-  calendar_event_id: z.string().min(1),
-  calendar_id: z.string().min(1),
-  session_index: z.number().int().positive(),
-  total_sessions: z.number().int().positive(),
-  planned_start: z.string().datetime({ offset: true }),
-  planned_end: z.string().datetime({ offset: true }),
-  status: MappingStatus,
-  plan_id: z.string().uuid().optional(),
-});
+const RecordMappingArgs = z
+  .object({
+    linear_issue_id: z.string().min(1),
+    linear_issue_identifier: z.string().min(1),
+    calendar_event_id: z.string().min(1),
+    calendar_id: z.string().min(1),
+    session_index: z.number().int().positive(),
+    total_sessions: z.number().int().positive(),
+    planned_start: z.string().datetime({ offset: true }),
+    planned_end: z.string().datetime({ offset: true }),
+    status: MappingStatus,
+    plan_id: z.string().uuid().optional(),
+  })
+  .refine((a) => a.session_index <= a.total_sessions, {
+    message: "session_index must be <= total_sessions",
+    path: ["session_index"],
+  });
 
 interface MappingRow {
   mapping_id: string;
@@ -130,11 +135,6 @@ export type Mapping = MappingRow;
 
 export function handleRecordMapping(rawArgs: unknown): { mapping_id: string } {
   const args = RecordMappingArgs.parse(rawArgs);
-  if (args.session_index > args.total_sessions) {
-    throw new Error(
-      `session_index ${args.session_index} > total_sessions ${args.total_sessions}`,
-    );
-  }
   const mappingId = randomUUID();
   getDb()
     .prepare(
