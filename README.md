@@ -28,7 +28,8 @@ Do these **before** running the agent. They're the timebox risk during the hacka
 ### 2. Run
 
 ```bash
-cp .env.example .env        # fill in any needed values
+cp .env.example .env                                           # fill in any needed values
+cp config/preferences.example.yaml config/preferences.yaml     # then edit primary_email + agent_writes_to
 
 make build                  # build scheduler-state image
 make up                     # start dozzle (log viewer at http://localhost:8080)
