@@ -14,9 +14,10 @@ You are the orchestration agent for a personal scheduling system. Three MCPs are
 
 - **Workspace:** `dustin-hack`
 - **Team key:** `DUS` (issues identified `DUS-N`). Resolve the team UUID at runtime via the Linear MCP (`list_teams` filtered by `key: "DUS"`) — don't hardcode it here.
-- **Project:** `Hackathon: Scheduler Agent`
+- **Active demo project:** `Demo - Auto-Scheduler Showcase` *(throwaway fixtures, currently the default for `/plan-week` and `/process-signals`)*.
+- **Hackathon-stories project:** `Hackathon: Scheduler Agent` *(real DUS-5..DUS-13 stories — keep separate from demo data so the meta-demo line stays clean)*.
 
-When listing Linear issues for `/plan-week`, restrict to this team + project unless the user explicitly asks otherwise.
+When listing Linear issues for `/plan-week`, restrict to this team + the **active demo project** unless the user explicitly asks otherwise. To plan against the hackathon project (e.g. for the closing meta-demo beat), pass the project name inline: `/plan-week project="Hackathon: Scheduler Agent"`.
 
 ---
 

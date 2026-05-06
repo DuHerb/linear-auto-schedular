@@ -38,7 +38,7 @@ export const mappingsTools = [
   {
     name: "get_mappings_for_issue",
     description:
-      "Returns all mappings for a given Linear issue. Stub in v1 — implemented in Story 4.",
+      "Returns all mappings for a given Linear issue, ordered by session_index. Used by /process-signals to find existing schedules for Done/Cancelled events and to detect already-scheduled issues for idempotency on retries.",
     inputSchema: {
       type: "object" as const,
       properties: { linear_issue_id: { type: "string" } },
@@ -49,7 +49,7 @@ export const mappingsTools = [
   {
     name: "get_mapping_for_event",
     description:
-      "Returns the mapping for a given calendar event, or null. Stub in v1 — implemented in Story 4.",
+      "Returns the mapping for a given calendar event, or null.",
     inputSchema: {
       type: "object" as const,
       properties: { calendar_event_id: { type: "string" } },
@@ -66,13 +66,12 @@ export const mappingsTools = [
   {
     name: "update_mapping_status",
     description:
-      "Updates a mapping's status. Args: { mapping_id, status, note? }. Stub in v1 — implemented in Story 4.",
+      "Updates a mapping's status (scheduled | in_progress | completed | cancelled) and bumps updated_at. Used by /process-signals when Linear issue state changes drive calendar lifecycle. Args: { mapping_id, status }.",
     inputSchema: {
       type: "object" as const,
       properties: {
         mapping_id: { type: "string" },
         status: { type: "string" },
-        note: { type: "string" },
       },
       required: ["mapping_id", "status"],
       additionalProperties: false,
@@ -96,6 +95,19 @@ const MappingStatus = z.enum([
   "completed",
   "cancelled",
 ]);
+
+const GetMappingsForIssueArgs = z.object({
+  linear_issue_id: z.string().min(1),
+});
+
+const GetMappingForEventArgs = z.object({
+  calendar_event_id: z.string().min(1),
+});
+
+const UpdateMappingStatusArgs = z.object({
+  mapping_id: z.string().uuid(),
+  status: MappingStatus,
+});
 
 const RecordMappingArgs = z
   .object({
@@ -160,6 +172,57 @@ export function handleRecordMapping(rawArgs: unknown): { mapping_id: string } {
       args.plan_id ?? null,
     );
   return { mapping_id: mappingId };
+}
+
+export function handleGetMappingsForIssue(rawArgs: unknown): Mapping[] {
+  const { linear_issue_id } = GetMappingsForIssueArgs.parse(rawArgs);
+  const rows = getDb()
+    .prepare(
+      `SELECT mapping_id, linear_issue_id, linear_issue_identifier,
+              calendar_event_id, calendar_id,
+              session_index, total_sessions,
+              planned_start, planned_end,
+              status, plan_id, created_at, updated_at
+         FROM mappings
+        WHERE linear_issue_id = ?
+        ORDER BY session_index ASC`,
+    )
+    .all(linear_issue_id) as MappingRow[];
+  return rows;
+}
+
+export function handleGetMappingForEvent(rawArgs: unknown): Mapping | null {
+  const { calendar_event_id } = GetMappingForEventArgs.parse(rawArgs);
+  const row = getDb()
+    .prepare(
+      `SELECT mapping_id, linear_issue_id, linear_issue_identifier,
+              calendar_event_id, calendar_id,
+              session_index, total_sessions,
+              planned_start, planned_end,
+              status, plan_id, created_at, updated_at
+         FROM mappings
+        WHERE calendar_event_id = ?`,
+    )
+    .get(calendar_event_id) as MappingRow | undefined;
+  return row ?? null;
+}
+
+export function handleUpdateMappingStatus(rawArgs: unknown): {
+  mapping_id: string;
+  status: string;
+  updated_at: string;
+} {
+  const { mapping_id, status } = UpdateMappingStatusArgs.parse(rawArgs);
+  const updatedAt = new Date().toISOString();
+  const result = getDb()
+    .prepare(
+      "UPDATE mappings SET status = ?, updated_at = ? WHERE mapping_id = ?",
+    )
+    .run(status, updatedAt, mapping_id);
+  if (result.changes === 0) {
+    throw new Error(`mapping ${mapping_id} not found`);
+  }
+  return { mapping_id, status, updated_at: updatedAt };
 }
 
 export function handleListActiveMappings(): Mapping[] {

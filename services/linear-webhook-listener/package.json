@@ -1,0 +1,21 @@
+{
+  "name": "linear-webhook-listener",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTP listener for Linear webhooks. Verifies HMAC-SHA256, writes signals to scheduler-state SQLite, returns 200. Drain via /process-signals slash command (host loop).",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "11.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.12",
+    "@types/node": "20.16.10",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3"
+  }
+}

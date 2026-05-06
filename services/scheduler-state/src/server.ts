@@ -15,8 +15,16 @@ import {
   mappingsTools,
   handleRecordMapping,
   handleListActiveMappings,
+  handleGetMappingsForIssue,
+  handleGetMappingForEvent,
+  handleUpdateMappingStatus,
 } from "./tools/mappings.js";
-import { signalsTools } from "./tools/signals.js";
+import {
+  signalsTools,
+  handleLogSignal,
+  handleListSignals,
+  handleMarkSignalProcessed,
+} from "./tools/signals.js";
 
 const allTools = [
   healthCheckTool,
@@ -36,6 +44,12 @@ const handlers: Record<string, Handler> = {
   mark_plan_applied: (args) => handleMarkPlanApplied(args),
   record_mapping: (args) => handleRecordMapping(args),
   list_active_mappings: () => handleListActiveMappings(),
+  get_mappings_for_issue: (args) => handleGetMappingsForIssue(args),
+  get_mapping_for_event: (args) => handleGetMappingForEvent(args),
+  update_mapping_status: (args) => handleUpdateMappingStatus(args),
+  log_signal: (args) => handleLogSignal(args),
+  list_signals: (args) => handleListSignals(args),
+  mark_signal_processed: (args) => handleMarkSignalProcessed(args),
 };
 
 export function createServer(): Server {

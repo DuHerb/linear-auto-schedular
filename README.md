@@ -97,6 +97,77 @@ See [`PLANNING.md`](./PLANNING.md) §"Repository layout".
 
 ---
 
+## Webhook-driven auto-scheduling (DUS-9)
+
+Linear webhook → calendar update within ~30s, no manual `claude` invocation. Two cooperating processes:
+
+```mermaid
+flowchart LR
+  L[Linear] -->|HMAC-signed POST| S[smee.io channel]
+  S -->|SSE stream| F[smee-client<br/>host process]
+  F -->|forward| W[linear-webhook-listener<br/>Docker :3000]
+  W -->|HMAC verify + INSERT| DB[(scheduler.db<br/>signals table)]
+  Loop[make watch-signals<br/>host loop, 30s] -->|claude -p /process-signals<br/>--dangerously-skip-permissions| C[claude]
+  C -->|read| DB
+  C -->|create / update / delete| GC[Google Calendar<br/>Focus Sessions]
+  C -->|update_mapping_status<br/>mark_signal_processed| DB
+```
+
+The listener does not invoke `claude` itself. The decoupling keeps the listener container minimal (no `claude` CLI, no host config mounts, ~6 ms response latency) and the polling loop trivially serializable.
+
+### One-time setup
+
+1. **Create a Smee channel.** Visit https://smee.io/new — copy the channel URL.
+2. **Create the Linear webhook.** Linear UI → Settings → API → Webhooks → New webhook:
+   - URL: the Smee channel URL from step 1.
+   - Resource types: **Issues** (minimum). Add **Comments** later if you want comment-thread re-estimation.
+   - Team: **Dustin-Hack** (or workspace-wide).
+   - Copy the signing secret Linear displays.
+3. **Populate `.env`:**
+   ```bash
+   LINEAR_WEBHOOK_SECRET=<paste-from-linear>
+   SMEE_URL=<paste-smee-channel-url>
+   ```
+4. **Build the listener image:** `make build-listener`.
+
+### Run the pipeline (three terminals)
+
+```bash
+# Terminal 1 — start listener container
+make webhook-up
+
+# Terminal 2 — forward Smee → localhost:3000 (HMAC verification still happens locally)
+make smee-forward
+
+# Terminal 3 — drain loop. Hits the calendar safety carve-out: writes events
+# without an interactive `yes` prompt. Triggered only by HMAC-verified signals.
+make watch-signals
+```
+
+Stop with Ctrl-C in each. `make webhook-down` stops the listener container.
+
+### Verifying the round-trip
+
+1. Drag a Linear ticket on the `dustin-hack` board to **Ready for Development**.
+2. Within ~30s, an event appears on the **Focus Sessions** calendar at the next available slot.
+3. Inspect the signal:
+   ```bash
+   sqlite3 data/scheduler.db \
+     "SELECT signal_id, kind, processed_at, resolution FROM signals ORDER BY received_at DESC LIMIT 5"
+   ```
+   The most recent row has `processed_at` set and a resolution like `scheduled:1:2026-05-07T10:00:00…`.
+
+### Calendar-safety carve-out
+
+The webhook drain (`make watch-signals` → `claude -p '/process-signals' --dangerously-skip-permissions`) is the **only** path that writes calendar events without interactive confirmation. The firewall is two layers thick:
+
+- **Listener** rejects any POST without a valid HMAC-SHA256 signature (401).
+- **Slash command** schedules only when no active mapping exists, cancels only future events, only on the `Focus Sessions` calendar.
+
+Authorized for DUS-9 specifically. All other calendar writes (`/apply-plan`) still go through interactive confirmation.
+
+---
+
 ## Status
 
 Pre-hackathon scaffold. Story 0 is mostly satisfied by the scaffold itself. Stories 1–4 implementation begins after the 4-hour timer starts.
