@@ -1,8 +1,14 @@
+import { loadPreferences } from "../prefs.js";
+
 export const preferencesTools = [
   {
     name: "get_preferences",
     description:
-      "Returns parsed preferences.yaml: timezone, working_hours, defaults, fixed_blocks, calendars. Stub in v1 — implemented in Story 1.",
+      "Returns parsed preferences.yaml: timezone, working_hours, defaults, fixed_blocks, calendars. Throws if the file is missing or fails schema validation.",
     inputSchema: { type: "object" as const, properties: {}, additionalProperties: false },
   },
 ];
+
+export function handleGetPreferences() {
+  return loadPreferences();
+}
