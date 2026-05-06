@@ -38,9 +38,12 @@ Reads the latest plan from `scheduler-state`, asks the user to confirm, then cre
      ```
      [Linear: ENG-123](https://linear.app/dustin-hack/issue/ENG-123)
 
-     **Estimate:** 90min (1 of 2 sessions)
+     **Estimate:** 90min (session 1 of 2 — total 180min)
+     **Priority:** Urgent
      **Reasoning:** <session.reasoning>
      ```
+
+     Pull `estimate_minutes_session`, `estimate_minutes_total`, and `priority` from the session JSON. If only the legacy `estimate_minutes` field is present (plans saved before DUS-8), use it for both numbers and omit the total when single-session.
    - Start / end: from session JSON. Honor the timezone in preferences.
 
 6. **Record each mapping** — after each successful `create_event`, call `scheduler-state.record_mapping` with:
