@@ -15,7 +15,7 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
    - Team: from `CLAUDE.md` (Linear scope section)
    - Assignee: me
    - Status in: Backlog, Todo, In Progress, Ready for Development
-   - Order: priority desc (Urgent → P1 → P2 → P3 → P4), then created_at asc
+   - All matched issues are scheduled regardless of priority; ordering happens in step 5. Carry Linear's numeric `priority` field through verbatim (0=None, 1=Urgent, 2=High, 3=Medium, 4=Low) — the planner re-sorts.
 
 3. **Read issue context for estimation** — for each issue returned in step 2, call `linear.get_issue(id)` so the body and the full comment thread are loaded (the `list_issues` response carries titles + priorities only). Estimate effort in minutes from that text. No ML model, no fixture lookup — pure LLM judgment from the issue text. Surface one short reasoning line per issue tied to concrete signals.
 
@@ -42,12 +42,19 @@ Generate a weekly plan that schedules Linear issues assigned to the user, respec
    - Honor `fixed_blocks` of `type: block` (lunch, office_hours) — never schedule over them.
    - For `fixed_blocks` of `type: flexible` (workout) — pick a slot inside the window.
    - **Sequencing.** Order issues by Linear `priority` (1 Urgent → 2 High → 3 Medium → 4 Low → 0 None). Tie-break equal-priority issues by `createdAt` ascending (older first). Worked example: P1 created Mar 5 lands before P1 created Mar 7; both land before any P2.
-   - **Chunking.** If `estimate_minutes <= session_max_minutes` → one session. Otherwise split into `N = ceil(estimate / session_max_minutes)` equal-ish sessions, each `round(estimate / N)` minutes. Schedule chunks in `session_index` order (1, 2, …, N), with the constraint that a higher-index chunk must start at or after the previous chunk's end. Worked examples (with default `session_max_minutes=120`):
+   - **Chunking.** If `estimate_minutes <= session_max_minutes` → one session. Otherwise split into `N = ceil(estimate / session_max_minutes)` equal-ish sessions, each `round(estimate / N)` minutes; the **last session absorbs any rounding slack** so the chunk durations always sum to `estimate_minutes` exactly. Schedule chunks in `session_index` order (1, 2, …, N), with the constraint that a higher-index chunk must start at or after the previous chunk's end. Worked examples (with default `session_max_minutes=120`):
      - 90 min → 1 session of 90
      - 180 min → 2 sessions of 90 (not 120 + 60 — keep chunks roughly equal so reasoning is consistent across sessions)
      - 240 min → 2 sessions of 120
      - 300 min → 3 sessions of 100
-   - **Breaks.** Track continuous-work minutes per day. After accumulating `break_after_minutes` of work, insert a `break_duration_minutes` gap before scheduling the next session. The break does not need to be its own JSON entry — just leave the gap in the markdown output and skip those minutes when picking the next session's start. Reset the counter when crossing a busy block, lunch, or end-of-day. Worked example with defaults (`break_after_minutes=120`, `break_duration_minutes=15`): a 90 min session then a 60 min session back-to-back is fine (90 + 60 = 150 > 120, so insert the 15 min break *before* the 60 min session begins, not in the middle of it).
+     - 250 min → 3 sessions of 83 + 83 + 84 (last absorbs the +1)
+     - 200 min → 3 sessions of 67 + 67 + 66 (last absorbs the −1)
+   - **Cross-day fit.** When a chunk doesn't fit the current day's remaining slot:
+     1. If the slot is `>= session_min_minutes`, schedule a smaller chunk that fills the slot (still ≤ `session_max_minutes`), then re-chunk the remainder for subsequent days. The chunk count `N` may grow beyond the initial `ceil()` because day boundaries forced a smaller piece.
+     2. If the slot is `< session_min_minutes`, skip the rest of the day and start the next chunk on the next available day at the chunks's full size.
+     3. Re-chunked remainders still honor `session_max_minutes`. Example: 240 min issue, day 1 has 60 min free → schedule chunk 1 = 60 min on day 1; remaining 180 min re-chunks into 2×90 across day 2 (total 3 sessions, not the originally-planned 2).
+     4. `session_index` and `total_sessions` reflect the *final* chunk count after cross-day adjustment, not the initial `ceil()` estimate.
+   - **Breaks (anticipatory).** Track continuous-work minutes per day. Before scheduling each session, check whether adding it would push the counter past `break_after_minutes`. If so, insert a `break_duration_minutes` gap *before* the session and reset the counter to 0; the new session then starts fresh and increments the counter by its own duration. The break does not need to be its own JSON entry — just leave the gap in the markdown output and skip those minutes when picking the next session's start. Reset the counter when crossing a busy block, lunch, or end-of-day (those are natural breaks). Worked example with `break_after_minutes=120`, `break_duration_minutes=15`: 90 min session (counter=90) → next is 60 min, 90+60=150 > 120 → insert 15 min break *first*, reset counter, then schedule 60 min session (counter=60). Result: `90 → break → 60 → …`. The intent is to never let the agent actually do more than `break_after_minutes` of continuous focused work.
 
 6. **Output the plan** — markdown to stdout, grouped by weekday:
 
